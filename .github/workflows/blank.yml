@@ -1,0 +1,133 @@
+name: Generate Forensics CTF Challenge
+on: [workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Git identity
+        run: |
+          git config --global user.name "Developer"
+          git config --global user.email "developer@example.com"
+      
+      - name: Generate repository with multiple branches
+        run: |
+          # Initial legitimate commits
+          echo "# Project Documentation" > README.md
+          git add README.md
+          git commit -m "Initial commit"
+          
+          # Add some code files
+          mkdir src
+          echo "console.log('Hello world');" > src/app.js
+          git add src/
+          git commit -m "Add application code"
+          
+          # RED HERRING 1: Add fake flag in obvious place
+          echo "// TODO: Remove before production" >> src/app.js
+          echo "const TEMP_FLAG = 'itec{f4k3_fl4g_d0nt_b3_f00l3d}';" >> src/app.js
+          git add src/app.js
+          git commit -m "Add temporary authentication"
+          
+          # Create 20 feature branches with content
+          for i in {1..20}
+          do
+            git checkout -b feature/branch-$i
+            
+            # Add a feature-specific file
+            echo "// Feature branch $i implementation" > src/feature-$i.js
+            git add src/feature-$i.js
+            git commit -m "Implement feature $i"
+            
+            # Add a test file
+            mkdir -p tests/feature-$i
+            echo "describe('Feature $i', () => { it('should work', () => { expect(true).toBe(true); }); });" > tests/feature-$i/test.js
+            git add tests/feature-$i
+            git commit -m "Add tests for feature $i"
+            
+            # Add some red herrings in some branches
+            if [ $i -eq 5 ]; then
+              echo "const SECRET_KEY = 'itec{7h15_15_n07_7h3_r34l_fl4g}';" > src/secrets-$i.js
+              git add src/secrets-$i.js
+              git commit -m "Add configuration for feature $i"
+            fi
+            
+            if [ $i -eq 17 ]; then
+              echo "// Flag candidate: itec{4lm057_7h3r3_bu7_n07_qu173}" > src/flag-candidate.js
+              git add src/flag-candidate.js
+              git commit -m "Temporary flag for testing"
+            fi
+            
+            # Put the real flag in branch 12, split across 3 files
+            if [ $i -eq 12 ]; then
+              # First part of the flag
+              mkdir -p config/security
+              echo "module.exports = {
+                // PART 1/3: itec{53n5171v3_
+                securityLevel: 'high',
+                encryption: 'aes-256-gcm'
+              };" > config/security/encryption.js
+              git add config/security/encryption.js
+              git commit -m "Add encryption configuration"
+              
+              # Second part of the flag
+              mkdir -p src/models
+              echo "class UserModel {
+                constructor() {
+                  this.fields = ['username', 'email', 'password'];
+                  /* PART 2/3: d474_g07_l34k3d_ */
+                }
+                
+                validate() {
+                  return true;
+                }
+              }" > src/models/user.js
+              git add src/models/user.js
+              git commit -m "Add user model"
+              
+              # Third part of the flag
+              mkdir -p utils
+              echo "/**
+               * Authentication utilities
+               * @version 1.0.0
+               * 
+               * @notes PART 3/3: v14_g17}
+               */
+              
+              function verifyToken(token) {
+                // Implementation
+                return token.length > 0;
+              }
+              
+              module.exports = { verifyToken };" > utils/auth.js
+              git add utils/auth.js
+              git commit -m "Add authentication utilities"
+              
+              # Add a commit that tries to remove these references
+              sed -i 's/PART 1\/3: itec{53n5171v3_/REMOVED/g' config/security/encryption.js
+              sed -i 's/PART 2\/3: d474_g07_l34k3d_/REMOVED/g' src/models/user.js
+              sed -i 's/PART 3\/3: v14_g17}/REMOVED/g' utils/auth.js
+              git add config/security/encryption.js src/models/user.js utils/auth.js
+              git commit -m "Remove sensitive data references"
+            fi
+            
+            # Return to main branch
+            git checkout main
+          done
+          
+          # Merge a few non-sensitive branches to main
+          git merge feature/branch-1 -m "Merge feature 1"
+          git merge feature/branch-7 -m "Merge feature 7"
+          git merge feature/branch-19 -m "Merge feature 19"
+          
+          # Create a tag with a hint
+          git tag -a v0.1 -m "First release - Features 1, 7, and 19 included. Others pending security review."
+          
+          # Push everything
+          git push origin main
+          for i in {1..20}
+          do
+            git push origin feature/branch-$i
+          done
+          git push --tags
